@@ -99,6 +99,8 @@
 /* Global pointers on Tx and Rx descriptor used to track transmit and receive descriptors */
 __IO ETH_DMADESCTypeDef  *DMATxDescToSet;
 __IO ETH_DMADESCTypeDef  *DMARxDescToGet;
+__IO ETH_DMADESCTypeDef  *DMAPTPTxDescToSet;
+__IO ETH_DMADESCTypeDef  *DMAPTPRxDescToGet;
 
 
 /* Structure used to hold the last received packet descriptors info */
@@ -106,7 +108,6 @@ __IO ETH_DMADESCTypeDef  *DMARxDescToGet;
 ETH_DMA_Rx_Frame_infos RX_Frame_Descriptor;
 __IO ETH_DMA_Rx_Frame_infos *DMA_RX_FRAME_infos;
 __IO uint32_t Frame_Rx_index;
-
 
 /**
   * @}
@@ -754,10 +755,11 @@ FlagStatus ETH_GetMACFlagStatus(uint32_t ETH_MAC_FLAG)
   */
 ITStatus ETH_GetMACITStatus(uint32_t ETH_MAC_IT)
 {
+	uint32_t MACSR = ETH->MACSR;
   ITStatus bitstatus = RESET;
   /* Check the parameters */
-  assert_param(IS_ETH_MAC_GET_IT(ETH_MAC_IT)); 
-  if ((ETH->MACSR & ETH_MAC_IT) != (uint32_t)RESET)
+//  assert_param(IS_ETH_MAC_GET_IT(ETH_MAC_IT)); 
+  if ((MACSR & ETH_MAC_IT) != (uint32_t)RESET)
   {
     bitstatus = SET;
   }
@@ -1493,6 +1495,30 @@ void ETH_DMATxDescShortFramePaddingCmd(ETH_DMADESCTypeDef *DMATxDesc, Functional
   {
     /* Disable the selected DMA Tx Desc padding for frame shorter than 64 bytes*/
     DMATxDesc->Status |= ETH_DMATxDesc_DP; 
+  }
+}
+
+/**
+  * @brief  Enables or disables the DMA Tx Desc time stamp.
+  * @param  DMATxDesc: pointer on a DMA Tx descriptor
+  * @param  NewState: new state of the specified DMA Tx Desc time stamp.
+  *   This parameter can be: ENABLE or DISABLE.
+  * @retval None
+  */
+void ETH_DMATxDescTimeStampCmd(ETH_DMADESCTypeDef *DMATxDesc, FunctionalState NewState)
+{
+  /* Check the parameters */
+  assert_param(IS_FUNCTIONAL_STATE(NewState));
+  
+  if (NewState != DISABLE)
+  {
+    /* Enable the selected DMA Tx Desc time stamp */
+    DMATxDesc->Status |= ETH_DMATxDesc_TTSE;  
+  }
+  else
+  {
+    /* Disable the selected DMA Tx Desc time stamp */
+    DMATxDesc->Status &=(~(uint32_t)ETH_DMATxDesc_TTSE); 
   }
 }
 
@@ -2687,7 +2713,475 @@ uint32_t ETH_GetMMCRegister(uint32_t ETH_MMCReg)
   return (*(__IO uint32_t *)(ETH_MAC_BASE + ETH_MMCReg));
 }
 
+/*---------------------------------  PTP  ------------------------------------*/
 
+/**
+  * @brief  Updated the PTP block for fine correction with the Time Stamp Addend register value.
+  * @param  None
+  * @retval None
+  */
+void ETH_EnablePTPTimeStampAddend(void)
+{
+  /* Enable the PTP block update with the Time Stamp Addend register value */
+  ETH->PTPTSCR |= ETH_PTPTSCR_TSARU;    
+}
+
+/**
+  * @brief  Enable the PTP Time Stamp interrupt trigger
+  * @param  None
+  * @retval None
+  */
+void ETH_EnablePTPTimeStampInterruptTrigger(void)
+{
+  /* Enable the PTP target time interrupt */
+  ETH->PTPTSCR |= ETH_PTPTSCR_TSITE;    
+}
+
+/**
+  * @brief  Updated the PTP system time with the Time Stamp Update register value.
+  * @param  None
+  * @retval None
+  */
+void ETH_EnablePTPTimeStampUpdate(void)
+{
+  /* Enable the PTP system time update with the Time Stamp Update register value */
+  ETH->PTPTSCR |= ETH_PTPTSCR_TSSTU;    
+}
+
+/**
+  * @brief  Initialize the PTP Time Stamp
+  * @param  None
+  * @retval None
+  */
+void ETH_InitializePTPTimeStamp(void)
+{
+  /* Initialize the PTP Time Stamp */
+  ETH->PTPTSCR |= ETH_PTPTSCR_TSSTI;    
+}
+
+/**
+  * @brief  Selects the PTP Update method
+  * @param  UpdateMethod: the PTP Update method
+  *   This parameter can be one of the following values:
+  *     @arg ETH_PTP_FineUpdate   : Fine Update method 
+  *     @arg ETH_PTP_CoarseUpdate : Coarse Update method 
+  * @retval None
+  */
+void ETH_PTPUpdateMethodConfig(uint32_t UpdateMethod)
+{
+  /* Check the parameters */
+  assert_param(IS_ETH_PTP_UPDATE(UpdateMethod));
+  
+  if (UpdateMethod != ETH_PTP_CoarseUpdate)
+  {
+    /* Enable the PTP Fine Update method */
+    ETH->PTPTSCR |= ETH_PTPTSCR_TSFCU;
+  }
+  else
+  {
+    /* Disable the PTP Coarse Update method */
+    ETH->PTPTSCR &= (~(uint32_t)ETH_PTPTSCR_TSFCU);
+  } 
+}
+
+/**
+  * @brief  Enables or disables the PTP time stamp for transmit and receive frames.
+  * @param  NewState: new state of the PTP time stamp for transmit and receive frames
+  *   This parameter can be: ENABLE or DISABLE.
+  * @retval None
+  */
+void ETH_PTPTimeStampCmd(FunctionalState NewState)
+{
+  /* Check the parameters */
+  assert_param(IS_FUNCTIONAL_STATE(NewState));
+  
+  if (NewState != DISABLE)
+  {
+    /* Enable the PTP time stamp for transmit and receive frames */
+    ETH->PTPTSCR |= ETH_PTPTSCR_TSE;
+  }
+  else
+  {
+    /* Disable the PTP time stamp for transmit and receive frames */
+    ETH->PTPTSCR &= (~(uint32_t)ETH_PTPTSCR_TSE);
+  }
+}
+
+/**
+  * @brief  Checks whether the specified ETHERNET PTP flag is set or not.
+  * @param  ETH_PTP_FLAG: specifies the flag to check.
+  *   This parameter can be one of the following values:
+  *     @arg ETH_PTP_FLAG_TSARU : Addend Register Update 
+  *     @arg ETH_PTP_FLAG_TSITE : Time Stamp Interrupt Trigger Enable 
+  *     @arg ETH_PTP_FLAG_TSSTU : Time Stamp Update 
+  *     @arg ETH_PTP_FLAG_TSSTI  : Time Stamp Initialize                       
+  * @retval The new state of ETHERNET PTP Flag (SET or RESET).
+  */
+FlagStatus ETH_GetPTPFlagStatus(uint32_t ETH_PTP_FLAG)
+{
+  FlagStatus bitstatus = RESET;
+  /* Check the parameters */
+  assert_param(IS_ETH_PTP_GET_FLAG(ETH_PTP_FLAG));
+  
+  if ((ETH->PTPTSCR & ETH_PTP_FLAG) != (uint32_t)RESET)
+  {
+    bitstatus = SET;
+  }
+  else
+  {
+    bitstatus = RESET;
+  }
+  return bitstatus;
+}
+
+/**
+  * @brief  Sets the system time Sub-Second Increment value.
+  * @param  SubSecondValue: specifies the PTP Sub-Second Increment Register value.
+  * @retval None
+  */
+void ETH_SetPTPSubSecondIncrement(uint32_t SubSecondValue)
+{
+  /* Check the parameters */
+  assert_param(IS_ETH_PTP_SUBSECOND_INCREMENT(SubSecondValue));
+  /* Set the PTP Sub-Second Increment Register */
+  ETH->PTPSSIR = SubSecondValue;    
+}
+
+/**
+  * @brief  Sets the Time Stamp update sign and values.
+  * @param  Sign: specifies the PTP Time update value sign.
+  *   This parameter can be one of the following values:
+  *     @arg ETH_PTP_PositiveTime : positive time value. 
+  *     @arg ETH_PTP_NegativeTime : negative time value.  
+  * @param  SecondValue: specifies the PTP Time update second value. 
+  * @param  SubSecondValue: specifies the PTP Time update sub-second value.
+  *   This parameter is a 31 bit value, bit32 correspond to the sign.
+  * @retval None
+  */
+void ETH_SetPTPTimeStampUpdate(uint32_t Sign, uint32_t SecondValue, uint32_t SubSecondValue)
+{
+  /* Check the parameters */
+  assert_param(IS_ETH_PTP_TIME_SIGN(Sign));  
+  assert_param(IS_ETH_PTP_TIME_STAMP_UPDATE_SUBSECOND(SubSecondValue)); 
+  /* Set the PTP Time Update High Register */
+  ETH->PTPTSHUR = SecondValue;
+  
+  /* Set the PTP Time Update Low Register with sign */
+  ETH->PTPTSLUR = Sign | SubSecondValue;   
+}
+
+/**
+  * @brief  Sets the Time Stamp Addend value.
+  * @param  Value: specifies the PTP Time Stamp Addend Register value.
+  * @retval None
+  */
+void ETH_SetPTPTimeStampAddend(uint32_t Value)
+{
+  /* Set the PTP Time Stamp Addend Register */
+  ETH->PTPTSAR = Value;    
+}
+
+/**
+  * @brief  Sets the Target Time registers values.
+  * @param  HighValue: specifies the PTP Target Time High Register value.
+  * @param  LowValue: specifies the PTP Target Time Low Register value.
+  * @retval None
+  */
+void ETH_SetPTPTargetTime(uint32_t HighValue, uint32_t LowValue)
+{
+  /* Set the PTP Target Time High Register */
+  ETH->PTPTTHR = HighValue;
+  /* Set the PTP Target Time Low Register */
+  ETH->PTPTTLR = LowValue;    
+}
+
+/**
+  * @brief  Get the specified ETHERNET PTP register value.
+  * @param  ETH_PTPReg: specifies the ETHERNET PTP register.
+  *   This parameter can be one of the following values:
+  *     @arg ETH_PTPTSCR  : Sub-Second Increment Register 
+  *     @arg ETH_PTPSSIR  : Sub-Second Increment Register 
+  *     @arg ETH_PTPTSHR  : Time Stamp High Register
+  *     @arg ETH_PTPTSLR  : Time Stamp Low Register 
+  *     @arg ETH_PTPTSHUR : Time Stamp High Update Register  
+  *     @arg ETH_PTPTSLUR : Time Stamp Low Update Register
+  *     @arg ETH_PTPTSAR  : Time Stamp Addend Register
+  *     @arg ETH_PTPTTHR  : Target Time High Register 
+  *     @arg ETH_PTPTTLR  : Target Time Low Register 
+  * @retval The value of ETHERNET PTP Register value.
+  */
+uint32_t ETH_GetPTPRegister(uint32_t ETH_PTPReg)
+{
+  /* Check the parameters */
+  assert_param(IS_ETH_PTP_REGISTER(ETH_PTPReg));
+  
+  /* Return the selected register value */
+  return (*(__IO uint32_t *)(ETH_MAC_BASE + ETH_PTPReg));
+}
+
+/**
+  * @brief  Initializes the DMA Tx descriptors in chain mode with PTP.
+  * @param  DMATxDescTab: Pointer on the first Tx desc list 
+  * @param  DMAPTPTxDescTab: Pointer on the first PTP Tx desc list
+  * @param  TxBuff: Pointer on the first TxBuffer list
+  * @param  TxBuffCount: Number of the used Tx desc in the list
+  * @retval None
+  */
+void ETH_DMAPTPTxDescChainInit(ETH_DMADESCTypeDef *DMATxDescTab, ETH_DMADESCTypeDef *DMAPTPTxDescTab,
+                               uint8_t* TxBuff, uint32_t TxBuffCount)
+{
+  uint32_t i = 0;
+  ETH_DMADESCTypeDef *DMATxDesc;
+  
+  /* Set the DMATxDescToSet pointer with the first one of the DMATxDescTab list */
+  DMATxDescToSet = DMATxDescTab;
+  DMAPTPTxDescToSet = DMAPTPTxDescTab;
+  /* Fill each DMATxDesc descriptor with the right values */   
+  for(i=0; i < TxBuffCount; i++)
+  {
+    /* Get the pointer on the ith member of the Tx Desc list */
+    DMATxDesc = DMATxDescTab+i;
+    /* Set Second Address Chained bit and enable PTP */
+    DMATxDesc->Status = ETH_DMATxDesc_TCH | ETH_DMATxDesc_TTSE;  
+       
+    /* Set Buffer1 address pointer */
+    DMATxDesc->Buffer1Addr =(uint32_t)(&TxBuff[i*ETH_MAX_PACKET_SIZE]);
+    
+    /* Initialize the next descriptor with the Next Desciptor Polling Enable */
+    if(i < (TxBuffCount-1))
+    {
+      /* Set next descriptor address register with next descriptor base address */
+      DMATxDesc->Buffer2NextDescAddr = (uint32_t)(DMATxDescTab+i+1);
+    }
+    else
+    {
+      /* For last descriptor, set next descriptor address register equal to the first descriptor base address */ 
+      DMATxDesc->Buffer2NextDescAddr = (uint32_t) DMATxDescTab;  
+    }
+    /* make DMAPTPTxDescTab points to the same addresses as DMATxDescTab */
+    (&DMAPTPTxDescTab[i])->Buffer1Addr = DMATxDesc->Buffer1Addr;
+    (&DMAPTPTxDescTab[i])->Buffer2NextDescAddr = DMATxDesc->Buffer2NextDescAddr;
+  }
+  /* Store on the last DMAPTPTxDescTab desc status record the first list address */
+  (&DMAPTPTxDescTab[i-1])->Status = (uint32_t) DMAPTPTxDescTab;
+
+  /* Set Transmit Desciptor List Address Register */
+  ETH->DMATDLAR = (uint32_t) DMATxDescTab;
+}
+
+/**
+  * @brief  Initializes the DMA Rx descriptors in chain mode.
+  * @param  DMARxDescTab: Pointer on the first Rx desc list 
+  * @param  DMAPTPRxDescTab: Pointer on the first PTP Rx desc list
+  * @param  RxBuff: Pointer on the first RxBuffer list
+  * @param  RxBuffCount: Number of the used Rx desc in the list
+  * @retval None
+  */
+void ETH_DMAPTPRxDescChainInit(ETH_DMADESCTypeDef *DMARxDescTab, ETH_DMADESCTypeDef *DMAPTPRxDescTab,
+                               uint8_t *RxBuff, uint32_t RxBuffCount)
+{
+  uint32_t i = 0;
+  ETH_DMADESCTypeDef *DMARxDesc;
+  
+  /* Set the DMARxDescToGet pointer with the first one of the DMARxDescTab list */
+  DMARxDescToGet = DMARxDescTab; 
+  DMAPTPRxDescToGet = DMAPTPRxDescTab;
+  /* Fill each DMARxDesc descriptor with the right values */
+  for(i=0; i < RxBuffCount; i++)
+  {
+    /* Get the pointer on the ith member of the Rx Desc list */
+    DMARxDesc = DMARxDescTab+i;
+    /* Set Own bit of the Rx descriptor Status */
+    DMARxDesc->Status = ETH_DMARxDesc_OWN;
+
+    /* Set Buffer1 size and Second Address Chained bit */
+    DMARxDesc->ControlBufferSize = ETH_DMARxDesc_RCH | (uint32_t)ETH_MAX_PACKET_SIZE;  
+    /* Set Buffer1 address pointer */
+    DMARxDesc->Buffer1Addr = (uint32_t)(&RxBuff[i*ETH_MAX_PACKET_SIZE]);
+    
+    /* Initialize the next descriptor with the Next Desciptor Polling Enable */
+    if(i < (RxBuffCount-1))
+    {
+      /* Set next descriptor address register with next descriptor base address */
+      DMARxDesc->Buffer2NextDescAddr = (uint32_t)(DMARxDescTab+i+1); 
+    }
+    else
+    {
+      /* For last descriptor, set next descriptor address register equal to the first descriptor base address */ 
+      DMARxDesc->Buffer2NextDescAddr = (uint32_t)(DMARxDescTab); 
+    }
+    /* Make DMAPTPRxDescTab points to the same addresses as DMARxDescTab */
+    (&DMAPTPRxDescTab[i])->Buffer1Addr = DMARxDesc->Buffer1Addr;
+    (&DMAPTPRxDescTab[i])->Buffer2NextDescAddr = DMARxDesc->Buffer2NextDescAddr;
+  }
+  /* Store on the last DMAPTPRxDescTab desc status record the first list address */
+  (&DMAPTPRxDescTab[i-1])->Status = (uint32_t) DMAPTPRxDescTab;
+
+  /* Set Receive Desciptor List Address Register */
+  ETH->DMARDLAR = (uint32_t) DMARxDescTab;  
+}
+
+/**
+  * @brief  Transmits a packet, from application buffer, pointed by ppkt with Time Stamp values.
+  * @param  ppkt: pointer to application packet buffer to transmit.
+  * @param  FrameLength: Tx Packet size.
+  * @param  PTPTxTab: Pointer on the first PTP Tx table to store Time stamp values.
+  * @retval ETH_ERROR: in case of Tx desc owned by DMA
+  *         ETH_SUCCESS: for correct transmission
+  */
+uint32_t ETH_HandlePTPTxPkt(uint8_t *ppkt, uint16_t FrameLength, uint32_t *PTPTxTab)
+{
+  uint32_t offset = 0, timeout = 0;
+  /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
+  if((DMATxDescToSet->Status & ETH_DMATxDesc_OWN) != (uint32_t)RESET)
+  {
+    /* Return ERROR: OWN bit set */
+    return ETH_ERROR;
+  }
+  /* Copy the frame to be sent into memory pointed by the current ETHERNET DMA Tx descriptor */      
+  for(offset=0; offset<FrameLength; offset++)
+  {
+    (*(__IO uint8_t *)((DMAPTPTxDescToSet->Buffer1Addr) + offset)) = (*(ppkt + offset));
+  }
+  /* Setting the Frame Length: bits[12:0] */
+  DMATxDescToSet->ControlBufferSize = (FrameLength & (uint32_t)0x1FFF);
+  /* Setting the last segment and first segment bits (in this case a frame is transmitted in one descriptor) */    
+  DMATxDescToSet->Status |= ETH_DMATxDesc_LS | ETH_DMATxDesc_FS;
+  /* Set Own bit of the Tx descriptor Status: gives the buffer back to ETHERNET DMA */
+  DMATxDescToSet->Status |= ETH_DMATxDesc_OWN;
+  /* When Tx Buffer unavailable flag is set: clear it and resume transmission */
+  if ((ETH->DMASR & ETH_DMASR_TBUS) != (uint32_t)RESET)
+  {
+    /* Clear TBUS ETHERNET DMA flag */
+    ETH->DMASR = ETH_DMASR_TBUS;
+    /* Resume DMA transmission*/
+    ETH->DMATPDR = 0;
+  }
+  /* Wait for ETH_DMATxDesc_TTSS flag to be set */
+  do
+  {
+    timeout++;
+  } while (!(DMATxDescToSet->Status & ETH_DMATxDesc_TTSS) && (timeout < 0xFFFF));
+  /* Return ERROR in case of timeout */
+  if(timeout == PHY_READ_TO)
+  {
+    return ETH_ERROR;
+  }
+  /* Clear the DMATxDescToSet status register TTSS flag */
+  DMATxDescToSet->Status &= ~ETH_DMATxDesc_TTSS;
+  *PTPTxTab++ = DMATxDescToSet->Buffer1Addr;
+  *PTPTxTab = DMATxDescToSet->Buffer2NextDescAddr;
+  /* Update the ENET DMA current descriptor */
+  /* Chained Mode */
+  if((DMATxDescToSet->Status & ETH_DMATxDesc_TCH) != (uint32_t)RESET)
+  {  
+    /* Selects the next DMA Tx descriptor list for next buffer read */ 
+    DMATxDescToSet = (ETH_DMADESCTypeDef*) (DMAPTPTxDescToSet->Buffer2NextDescAddr);
+    if(DMAPTPTxDescToSet->Status != 0)
+    { 
+      DMAPTPTxDescToSet = (ETH_DMADESCTypeDef*) (DMAPTPTxDescToSet->Status);
+    }
+    else
+    {
+      DMAPTPTxDescToSet++;
+    }
+  }
+  else /* Ring Mode */
+  {  
+    if((DMATxDescToSet->Status & ETH_DMATxDesc_TER) != (uint32_t)RESET)
+    {
+      /* Selects the next DMA Tx descriptor list for next buffer read: this will
+         be the first Tx descriptor in this case */
+      DMATxDescToSet = (ETH_DMADESCTypeDef*) (ETH->DMATDLAR); 
+      DMAPTPTxDescToSet = (ETH_DMADESCTypeDef*) (ETH->DMATDLAR);
+    }
+    else
+    {
+      /* Selects the next DMA Tx descriptor list for next buffer read */
+      DMATxDescToSet = (ETH_DMADESCTypeDef*) ((uint32_t)DMATxDescToSet + 0x10 + ((ETH->DMABMR & ETH_DMABMR_DSL) >> 2));      
+      DMAPTPTxDescToSet = (ETH_DMADESCTypeDef*) ((uint32_t)DMAPTPTxDescToSet + 0x10 + ((ETH->DMABMR & ETH_DMABMR_DSL) >> 2));      
+    }
+  }
+  /* Return SUCCESS */
+  return ETH_SUCCESS;
+}
+
+/**
+  * @brief  Receives a packet and copies it to memory pointed by ppkt with Time Stamp values.
+  * @param  ppkt: pointer to application packet receive buffer.  
+  * @param  PTPRxTab: Pointer on the first PTP Rx table to store Time stamp values.
+  * @retval ETH_ERROR: if there is error in reception
+  *         framelength: received packet size if packet reception is correct
+  */
+uint32_t ETH_HandlePTPRxPkt(uint8_t *ppkt, uint32_t *PTPRxTab)
+{
+  uint32_t offset = 0, framelength = 0;
+  /* Check if the descriptor is owned by the ENET or CPU */
+  if((DMARxDescToGet->Status & ETH_DMARxDesc_OWN) != (uint32_t)RESET)
+  {
+    /* Return error: OWN bit set */
+    return ETH_ERROR;
+  }
+  if(((DMARxDescToGet->Status & ETH_DMARxDesc_ES) == (uint32_t)RESET) &&
+     ((DMARxDescToGet->Status & ETH_DMARxDesc_LS) != (uint32_t)RESET) &&
+     ((DMARxDescToGet->Status & ETH_DMARxDesc_FS) != (uint32_t)RESET))
+  {
+    /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
+    framelength = ((DMARxDescToGet->Status & ETH_DMARxDesc_FL) >> ETH_DMARXDESC_FRAME_LENGTHSHIFT) - 4;
+    /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */ 
+    for(offset=0; offset<framelength; offset++)
+    {
+      (*(ppkt + offset)) = (*(__IO uint8_t *)((DMAPTPRxDescToGet->Buffer1Addr) + offset));
+    }
+  }
+  else
+  {
+    /* Return ERROR */
+    framelength = ETH_ERROR;
+  }
+  /* When Rx Buffer unavailable flag is set: clear it and resume reception */
+  if ((ETH->DMASR & ETH_DMASR_RBUS) != (uint32_t)RESET)
+  {
+    /* Clear RBUS ETHERNET DMA flag */
+    ETH->DMASR = ETH_DMASR_RBUS;
+    /* Resume DMA reception */
+    ETH->DMARPDR = 0;
+  }
+  *PTPRxTab++ = DMARxDescToGet->Buffer1Addr;
+  *PTPRxTab = DMARxDescToGet->Buffer2NextDescAddr;
+  /* Set Own bit of the Rx descriptor Status: gives the buffer back to ETHERNET DMA */
+  DMARxDescToGet->Status |= ETH_DMARxDesc_OWN;
+  /* Update the ETHERNET DMA global Rx descriptor with next Rx decriptor */
+  /* Chained Mode */
+  if((DMARxDescToGet->ControlBufferSize & ETH_DMARxDesc_RCH) != (uint32_t)RESET)
+  {
+    /* Selects the next DMA Rx descriptor list for next buffer read */
+    DMARxDescToGet = (ETH_DMADESCTypeDef*) (DMAPTPRxDescToGet->Buffer2NextDescAddr);
+    if(DMAPTPRxDescToGet->Status != 0)
+    {
+      DMAPTPRxDescToGet = (ETH_DMADESCTypeDef*) (DMAPTPRxDescToGet->Status);
+    }
+    else
+    {
+      DMAPTPRxDescToGet++;
+    }
+  }
+  else /* Ring Mode */
+  {
+    if((DMARxDescToGet->ControlBufferSize & ETH_DMARxDesc_RER) != (uint32_t)RESET)
+    {
+      /* Selects the first DMA Rx descriptor for next buffer to read: last Rx descriptor was used */
+      DMARxDescToGet = (ETH_DMADESCTypeDef*) (ETH->DMARDLAR);
+    }
+    else
+    {
+      /* Selects the next DMA Rx descriptor list for next buffer to read */
+      DMARxDescToGet = (ETH_DMADESCTypeDef*) ((uint32_t)DMARxDescToGet + 0x10 + ((ETH->DMABMR & ETH_DMABMR_DSL) >> 2));      
+    }
+  }
+  /* Return Frame Length/ERROR */
+  return (framelength);
+}
                                                    
 /**
   * @}

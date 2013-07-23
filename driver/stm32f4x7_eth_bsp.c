@@ -53,9 +53,6 @@ void ETH_BSP_Config(void)
   {
     while(1);
   }
-
-  /* Configure the PHY to generate an interrupt on change of link status */
-  Eth_Link_PHYITConfig(DP83848_PHY_ADDRESS);
 }
 
 /**
@@ -86,7 +83,6 @@ static void ETH_MACDMA_Config(void)
 
   /* Fill ETH_InitStructure parametrs */
   /*------------------------   MAC   -----------------------------------*/
-  //ETH_InitStructure.ETH_AutoNegotiation = ETH_AutoNegotiation_Enable;
   ETH_InitStructure.ETH_AutoNegotiation = ETH_AutoNegotiation_Enable; 
   ETH_InitStructure.ETH_Speed = ETH_Speed_100M;
   ETH_InitStructure.ETH_Mode = ETH_Mode_FullDuplex;   
@@ -124,7 +120,7 @@ static void ETH_MACDMA_Config(void)
   /* Configure Ethernet */
   EthInitStatus = ETH_Init(&ETH_InitStructure, DP83848_PHY_ADDRESS);
   /* Enable the Ethernet Rx Interrupt */
-  //ETH_DMAITConfig(ETH_DMA_IT_NIS | ETH_DMA_IT_R, ENABLE);
+  ETH_DMAITConfig(ETH_DMA_IT_NIS | ETH_DMA_IT_R, ENABLE);
 }
 
 /**
@@ -144,7 +140,7 @@ void ETH_GPIO_Config(void)
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB |
                          RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOI |
                          RCC_AHB1Periph_GPIOG | RCC_AHB1Periph_GPIOH |
-                         RCC_AHB1Periph_GPIOF, ENABLE);
+                         RCC_AHB1Periph_GPIOF | RCC_AHB1Periph_GPIOE, ENABLE);
 
   /* Enable SYSCFG clock */
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);  
@@ -171,7 +167,7 @@ void ETH_GPIO_Config(void)
         ETH_MII_RXD3 ---------------------> PB1
         ETH_MII_TX_CLK -------------------> PC3
         ETH_MII_TXD2 ---------------------> PC2
-        ETH_MII_TXD3 ---------------------> PB8
+        ETH_MII_TXD3 ---------------------> PB8 (PE2)
         ETH_MII_RX_CLK/ETH_RMII_REF_CLK---> PA1
         ETH_MII_RX_DV/ETH_RMII_CRS_DV ----> PA7
         ETH_MII_RXD0/ETH_RMII_RXD0 -------> PC4
@@ -190,9 +186,10 @@ void ETH_GPIO_Config(void)
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource0, GPIO_AF_ETH);
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_ETH);
 
-  /* Configure PB0, PB1, PB5, PB8, PB10, PB11 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_8 |GPIO_Pin_10 | GPIO_Pin_11;
+  /* Configure PB0, PB1, PB5, (PB8), PB10, PB11 */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_5 |GPIO_Pin_10 | GPIO_Pin_11 /*|GPIO_Pin_8*/;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource5, GPIO_AF_ETH);	
   GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_ETH);
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource0, GPIO_AF_ETH);
   GPIO_PinAFConfig(GPIOB, GPIO_PinSource1, GPIO_AF_ETH);
@@ -213,6 +210,11 @@ void ETH_GPIO_Config(void)
   GPIO_Init(GPIOG, &GPIO_InitStructure);
   GPIO_PinAFConfig(GPIOG, GPIO_PinSource13, GPIO_AF_ETH);
   GPIO_PinAFConfig(GPIOG, GPIO_PinSource14, GPIO_AF_ETH);
+	
+	/* Configure  PE2 */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+  GPIO_Init(GPIOE, &GPIO_InitStructure);
+  GPIO_PinAFConfig(GPIOE, GPIO_PinSource2, GPIO_AF_ETH);
 }
 
 /**

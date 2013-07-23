@@ -10,10 +10,13 @@ void SPI_Config(void);
 void initAnalog(void);
 
 int main(void) {
+	int temp = 5;
 	//configures the priority grouping
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_3);
 	//start time
 	start_timer();
+	//configure spi
+	SPI_Config();
 	//ETHERNET INITIALIZATION
   ETH_BSP_Config();
 	/* Initilaize the LwIP stack */
@@ -23,14 +26,15 @@ int main(void) {
 		return 1;
   while (1)
   {  
+		//PROCESSING OF PEREODIC TIMERS FOR LWIP
+    LwIP_Periodic_Handle(gettime());
 		//PROCESSING OF INCOMING PACKET
     if (ETH_CheckFrameReceived())
     { 
       /* process received ethernet packet */
       LwIP_Pkt_Handle();
     }
-    //PROCESSING OF PEREODIC TIMERS FOR LWIP
-   LwIP_Periodic_Handle(gettime());
+		trans_Control((void*)&temp, sizeof(temp));
   }   
 }
 
@@ -42,6 +46,7 @@ void SPI_Config(void) {
 	
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
 	//configure GPIO
 	structGPIO.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_6; //spi1
   structGPIO.GPIO_Mode = GPIO_Mode_AF;

@@ -235,6 +235,9 @@ typedef struct{
   u32 length;
   u32 buffer;
   __IO ETH_DMADESCTypeDef *descriptor;
+#if LWIP_PTP
+  __IO ETH_DMADESCTypeDef *PTPdescriptor;
+#endif
 }FrameTypeDef;
 
 
@@ -1805,6 +1808,7 @@ void ETH_DMATxDescChecksumInsertionConfig(ETH_DMADESCTypeDef *DMATxDesc, uint32_
 void ETH_DMATxDescCRCCmd(ETH_DMADESCTypeDef *DMATxDesc, FunctionalState NewState);
 void ETH_DMATxDescSecondAddressChainedCmd(ETH_DMADESCTypeDef *DMATxDesc, FunctionalState NewState);
 void ETH_DMATxDescShortFramePaddingCmd(ETH_DMADESCTypeDef *DMATxDesc, FunctionalState NewState);
+void ETH_DMATxDescTimeStampCmd(ETH_DMADESCTypeDef *DMATxDesc, FunctionalState NewState);
 void ETH_DMATxDescBufferSizeConfig(ETH_DMADESCTypeDef *DMATxDesc, uint32_t BufferSize1, uint32_t BufferSize2);
 FlagStatus ETH_GetDMARxDescFlagStatus(ETH_DMADESCTypeDef *DMARxDesc, uint32_t ETH_DMARxDescFlag);
 #ifdef USE_ENHANCED_DMA_DESCRIPTORS
@@ -1865,6 +1869,26 @@ void ETH_MMCCountersReset(void);
 void ETH_MMCITConfig(uint32_t ETH_MMC_IT, FunctionalState NewState);
 ITStatus ETH_GetMMCITStatus(uint32_t ETH_MMC_IT);
 uint32_t ETH_GetMMCRegister(uint32_t ETH_MMCReg);
+
+/** 
+  * @brief  PTP  
+  */ 
+uint32_t ETH_HandlePTPTxPkt(u8 *ppkt, u16 FrameLength, uint32_t *PTPTxTab);
+uint32_t ETH_HandlePTPRxPkt(u8 *ppkt, uint32_t *PTPRxTab);
+void ETH_DMAPTPTxDescChainInit(ETH_DMADESCTypeDef *DMATxDescTab, ETH_DMADESCTypeDef *DMAPTPTxDescTab, u8* TxBuff, uint32_t TxBuffCount);
+void ETH_DMAPTPRxDescChainInit(ETH_DMADESCTypeDef *DMARxDescTab, ETH_DMADESCTypeDef *DMAPTPRxDescTab, u8 *RxBuff, uint32_t RxBuffCount);
+void ETH_EnablePTPTimeStampAddend(void);
+void ETH_EnablePTPTimeStampInterruptTrigger(void);
+void ETH_EnablePTPTimeStampUpdate(void);
+void ETH_InitializePTPTimeStamp(void);
+void ETH_PTPUpdateMethodConfig(uint32_t UpdateMethod);
+void ETH_PTPTimeStampCmd(FunctionalState NewState);
+FlagStatus ETH_GetPTPFlagStatus(uint32_t ETH_PTP_FLAG);
+void ETH_SetPTPSubSecondIncrement(uint32_t SubSecondValue);
+void ETH_SetPTPTimeStampUpdate(uint32_t Sign, uint32_t SecondValue, uint32_t SubSecondValue);
+void ETH_SetPTPTimeStampAddend(uint32_t Value);
+void ETH_SetPTPTargetTime(uint32_t HighValue, uint32_t LowValue);
+uint32_t ETH_GetPTPRegister(uint32_t ETH_PTPReg);
 
 #ifdef __cplusplus
 }

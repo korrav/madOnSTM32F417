@@ -40,5 +40,5 @@
 
 bool udp_echoserver_init(void);
 void trans_Data(short* buf_ch1, short* buf_ch2, unsigned short num);
-
+void trans_Control(void* buf, size_t len);
 #endif /* __ECHO_H__ */

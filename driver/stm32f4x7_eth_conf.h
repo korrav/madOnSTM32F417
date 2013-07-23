@@ -63,7 +63,7 @@
 
 /* PHY configuration section **************************************************/
 /* PHY Reset delay */ 
-#define PHY_RESET_DELAY    ((uint32_t)0x000FFFF) 
+#define PHY_RESET_DELAY    ((uint32_t)0x0001388) 
 /* PHY Configuration delay */ 
 #define PHY_CONFIG_DELAY   ((uint32_t)0x00FFFF)
 

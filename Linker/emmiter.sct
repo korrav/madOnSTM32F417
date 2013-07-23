@@ -17,7 +17,6 @@ LR_IROM1 0x8000000 0x100000
 		;libshutdown*.o
 		;*(+RO-DATA)
 		*(+RO)
-		flash_pwm.o(.data)
 	}
 	
 	RW_IRAM2 0x10000000 0x00010000                        ;0x00010000  0x8000 
